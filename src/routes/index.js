@@ -1,1 +1,4 @@
-module.exports = function (app) {};
+const deviceService = require("./deviceService.router");
+module.exports = function (app) {
+  app.use("/device-service", deviceService);
+};
