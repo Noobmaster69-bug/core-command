@@ -2,18 +2,14 @@ const debug = require("../utils/debug")("app");
 const axios = require("axios");
 module.exports = {
   DSMODBUS: async function (req, res) {
-    const { name, SouthProtocol } = req.body;
+    const { name, SouthProtocol, NothProtocol, NothUrl } = req.body;
     const {
       data: { host, id, port, baudRate, parity, stopBits, dataBits, channels },
     } = await axios.post(
       process.env.METADATA || "http://127.0.0.1:33335/getCommand/ByName",
       { name }
     );
-    const data = await axios.post(
-      process.env.METADATA || "http://127.0.0.1:33335/getCommand/ByName",
-      { name }
-    );
-    debug(
+    try {
       await Promise.all(
         channels.map((channel) => {
           let path = SouthProtocol === "modbus-rtu" ? "rtu" : "tcp";
@@ -31,8 +27,10 @@ module.exports = {
             }
           );
         })
-      )
-    );
+      );
+    } catch (err) {
+      debug(err.message);
+    }
     return res.sendStatus(200);
   },
 };
