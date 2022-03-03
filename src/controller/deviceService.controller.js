@@ -1,5 +1,6 @@
 const debug = require("../utils/debug")("app");
 const axios = require("axios");
+const { client } = require("../config/redis");
 module.exports = {
   DSMODBUS: async function (req, res) {
     const { name, SouthProtocol, NothProtocol, NothUrl } = req.body;
@@ -10,7 +11,8 @@ module.exports = {
       { name }
     );
     try {
-      await Promise.all(
+      const gatewayId = await client.get("gatewayId");
+      const result = await Promise.all(
         channels.map((channel) => {
           let path = SouthProtocol === "modbus-rtu" ? "rtu" : "tcp";
           return axios.post(
@@ -28,6 +30,24 @@ module.exports = {
           );
         })
       );
+      const resultAsObject = result.reduce(
+        (pre, curr) => Object.assign(pre, curr.data),
+        {}
+      );
+      const package = {
+        gatewayId,
+        timestamp: new Date().toISOString(),
+        devices: {
+          [name]: resultAsObject,
+        },
+      };
+      axios
+        .post(
+          (process.env.MQTT || "http://127.0.0.1:33337") + "/telemetry",
+          package
+        )
+        .then()
+        .catch(debug);
     } catch (err) {
       debug(err.message);
     }
