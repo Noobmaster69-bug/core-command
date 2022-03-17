@@ -3,54 +3,54 @@ const axios = require("axios");
 const { client } = require("../config/redis");
 module.exports = {
   DSMODBUS: async function (req, res) {
-    const { name, SouthProtocol, NothProtocol, NothUrl } = req.body;
-    const {
-      data: { host, id, port, baudRate, parity, stopBits, dataBits, channels },
-    } = await axios.post(
-      process.env.METADATA || "http://127.0.0.1:33335/getCommand/ByName",
-      { name }
-    );
+    const { name, channels, southProtocol, isProvision } = req.body;
+    const protocol = req.body[southProtocol];
     try {
       const gatewayId = await client.get("gatewayId");
-      const result = await Promise.all(
-        channels.map((channel) => {
-          let path = SouthProtocol === "modbus-rtu" ? "rtu" : "tcp";
-          return axios.post(
-            `${process.env.DSMODBUS || "http://127.0.0.1:33336"}/${path}`,
-            {
-              host,
-              id,
-              port,
-              baudRate,
-              parity,
-              stopBits,
-              dataBits,
-              ...channel,
-            }
+      switch (southProtocol) {
+        case "modbusRTU":
+        case "modbusTCP":
+          const result = await Promise.all(
+            channels.map((e) =>
+              axios.post(
+                `${process.env.DSMODBUS || "http://127.0.0.1:33336"}/action/${
+                  southProtocol.split("modbus")[1]
+                }`,
+                {
+                  ...req.body[southProtocol],
+                  ...e,
+                }
+              )
+            )
           );
-        })
-      );
-      const resultAsObject = result.reduce(
-        (pre, curr) => Object.assign(pre, curr.data),
-        {}
-      );
-      const package = {
-        gatewayId,
-        timestamp: new Date().toISOString(),
-        devices: {
-          [name]: resultAsObject,
-        },
-      };
-      axios
-        .post(
-          (process.env.MQTT || "http://127.0.0.1:33337") + "/telemetry",
-          package
-        )
-        .then()
-        .catch(debug);
+          const resultAsObject = result.reduce(
+            (pre, curr) => Object.assign(pre, curr.data),
+            {}
+          );
+          const package = {
+            gatewayId,
+            timestamp: new Date().toISOString(),
+            devices: {
+              [name]: resultAsObject,
+            },
+          };
+          if (isProvision === true) {
+            axios
+              .post(
+                (process.env.MQTT || "http://127.0.0.1:33337") + "/telemetry",
+                package
+              )
+              .then()
+              .catch(debug);
+          }
+          res.send(200);
+          break;
+        default:
+          throw new Error("protocol not supported");
+      }
     } catch (err) {
-      debug(err.message);
+      debug(err);
+      res.send(404);
     }
-    return res.sendStatus(200);
   },
 };
