@@ -3,7 +3,8 @@ const axios = require("axios");
 const { client } = require("../config/redis");
 module.exports = {
   DSMODBUS: async function (req, res) {
-    const { name, channels, southProtocol, isProvision } = req.body;
+    const { name, channels, southProtocol, isProvision, northProtocol } =
+      req.body;
     const protocol = req.body[southProtocol];
     try {
       const gatewayId = await client.get("gatewayId");
@@ -34,14 +35,24 @@ module.exports = {
               [name]: resultAsObject,
             },
           };
+          console.log(package);
           if (isProvision === true) {
-            axios
-              .post(
-                (process.env.MQTT || "http://127.0.0.1:33337") + "/telemetry",
-                package
-              )
-              .then()
-              .catch(debug);
+            switch (northProtocol) {
+              case "mqtt":
+                axios
+                  .post(
+                    (process.env.MQTT || "http://127.0.0.1:33337") +
+                      "/telemetry",
+                    {
+                      id: req.body.mqtt.id,
+                      package,
+                    }
+                  )
+                  .then()
+                  .catch(debug);
+                break;
+              default:
+            }
           }
           res.send(200);
           break;
