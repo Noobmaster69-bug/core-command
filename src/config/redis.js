@@ -1,16 +1,24 @@
-const { createClient } = require("redis");
-const client = createClient();
-const subscriber = client.duplicate();
-const debug = require("../utils/debug")("app");
+const debug = require("../utils/debug")("redis");
+let client;
 (async () => {
-  client.on("error", (err) => console.log("Redis Client Error", err));
-
   try {
-    await client.connect();
-    await subscriber.connect();
+    const { createClient } = require("redis");
+    client = createClient();
+    client.on("error", (err) => {
+      if (err.code === "ECONNREFUSED") {
+      } else {
+        debug(err);
+      }
+    });
+    client.on("ready", () => {
+      debug("Redis ready!");
+    });
   } catch (err) {
-    console.log(err);
+    if (err.code === "ECONNREFUSED") {
+    } else {
+      console.log(err);
+    }
   }
 })();
 
-module.exports = { client, subscriber };
+module.exports = { client };

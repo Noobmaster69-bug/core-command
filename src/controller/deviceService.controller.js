@@ -35,7 +35,6 @@ module.exports = {
               [name]: resultAsObject,
             },
           };
-          console.log(package);
           if (isProvision === true) {
             switch (northProtocol) {
               case "mqtt":
