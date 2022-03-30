@@ -5,9 +5,12 @@ module.exports = {
   DSMODBUS: async function (req, res) {
     const { name, channels, southProtocol, isProvision, northProtocol } =
       req.body;
-    const protocol = req.body[southProtocol];
     try {
-      const gatewayId = await client.get("gatewayId");
+      const gatewayId = await new Promise((resolve, reject) => {
+        client.get("gatewayId", (err, reply) => {
+          resolve(reply);
+        });
+      });
       switch (southProtocol) {
         case "modbusRTU":
         case "modbusTCP":
@@ -37,13 +40,14 @@ module.exports = {
           };
           if (isProvision === true) {
             switch (northProtocol) {
+              case null:
               case "mqtt":
                 axios
                   .post(
                     (process.env.MQTT || "http://127.0.0.1:33337") +
                       "/telemetry",
                     {
-                      id: req.body.mqtt.id,
+                      id: req.body.mqtt?.deviceId || null,
                       package,
                     }
                   )
@@ -53,7 +57,7 @@ module.exports = {
               default:
             }
           }
-          res.send(200);
+          res.sendStatus(200);
           break;
         default:
           throw new Error("protocol not supported");
